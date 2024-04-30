@@ -1,6 +1,6 @@
 <p align="center">
     <a href="" rel="noopener">
-        <img width="700" height="400" src="" alt="Project logo">
+        <img width="700" height="400" src="https://github.com/OUGC-Network/OUGC-Private-Threads/assets/1786584/1c6984ee-f0a2-4f82-9aa4-3e1eef6a859e" alt="Project logo">
     </a>
 </p>
 
