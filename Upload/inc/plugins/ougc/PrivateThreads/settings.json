@@ -1,0 +1,66 @@
+{
+  "allowedGroups": {
+    "optionscode": "groupselect",
+    "value": -1
+  },
+  "enabledForums": {
+    "optionscode": "forumselect",
+    "value": -1
+  },
+  "allowEmptyUserList": {
+    "optionscode": "yesno",
+    "value": 0
+  },
+  "deleteSubscriptions": {
+    "optionscode": "yesno",
+    "value": 1
+  },
+  "allowGroupsBypass": {
+    "optionscode": "groupselect",
+    "value": 4
+  },
+  "allowModeratorBypass": {
+    "optionscode": "yesno",
+    "value": 1
+  },
+  "enableSearchSystem": {
+    "optionscode": "groupselect",
+    "value": -1
+  },
+  "assignPrefix": {
+    "optionscode": "yesno",
+    "value": 1
+  },
+  "prefixClassName": {
+    "optionscode": "text",
+    "value": "trow_private"
+  },
+  "showUserList": {
+    "optionscode": "yesno",
+    "value": 1
+  },
+  "allowStatusUpdate": {
+    "optionscode": "yesno",
+    "value": 1
+  },
+  "notificationTypes": {
+    "optionscode": "checkbox",
+    "options": [
+      "myalerts",
+      "pm"
+    ],
+    "value": "pm"
+  },
+  "allowStatusUpdate": {
+    "optionscode": "onoff",
+    "value": 1
+  },
+  "fixForumLastPost": {
+    "optionscode": "onoff",
+    "value": 1
+  },
+  "fixForumCount": {
+    "optionscode": "onoff",
+    "value": 0
+  }
+}
