@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/plugins/ougc/PrivateThreads/admin.php)
+ *    ougc Private Thread plugin (/inc/plugins/ougc/PrivateThreads/admin.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -32,7 +32,7 @@ namespace ougc\PrivateThreads\Admin;
 use DirectoryIterator;
 
 use function ougc\PrivateThreads\Core\loadLanguage;
-use function ougc\PrivateThreads\Core\pluginLibraryLoad;
+use function ougc\PrivateThreads\Core\pluginLibraryInformation;
 use function ougc\PrivateThreads\MyAlerts\getAvailableLocations;
 use function ougc\PrivateThreads\MyAlerts\getInstalledLocations;
 use function ougc\PrivateThreads\MyAlerts\MyAlertsIsIntegrable;
@@ -55,7 +55,7 @@ function pluginInformation(): array
     }
 
     return [
-        'name' => 'OUGC Private Threads',
+        'name' => 'ougc Private Thread',
         'description' => $pluginDescription,
         'website' => 'https://ougc.network',
         'author' => 'Omar G.',
@@ -75,9 +75,9 @@ function pluginInformation(): array
     ];
 }
 
-function pluginActivate(): bool
+function pluginActivate(): void
 {
-    global $PL, $lang, $cache, $db;
+    global $PL, $lang, $cache;
 
     pluginLibraryLoad();
 
@@ -128,7 +128,7 @@ function pluginActivate(): bool
     }
 
     if ($templates) {
-        $PL->templates('ougcPrivateThreads', 'OUGC Private Threads', $templates);
+        $PL->templates('ougcPrivateThreads', 'ougc Private Thread', $templates);
     }
 
     // Insert/update version into cache
@@ -157,16 +157,9 @@ function pluginActivate(): bool
     $pluginsCache['PrivateThreads'] = $pluginInfo['versioncode'];
 
     $cache->update('ougc_plugins', $pluginsCache);
-
-    return true;
 }
 
-function pluginDeactivate(): bool
-{
-    return false;
-}
-
-function pluginInstall(): bool
+function pluginInstall(): void
 {
     global $cache;
 
@@ -185,8 +178,6 @@ function pluginInstall(): bool
     $cache->update('ougcPrivateThreads', [
         'MyAlertLocationsInstalled' => $MyAlertLocationsInstalled,
     ]);
-
-    return true;
 }
 
 function pluginIsInstalled(): bool
@@ -212,7 +203,7 @@ function pluginIsInstalled(): bool
     return $isInstalled;
 }
 
-function pluginUninstall(): bool
+function pluginUninstall(): void
 {
     global $db, $PL, $cache;
 
@@ -248,7 +239,7 @@ function pluginUninstall(): bool
         }
     }
 
-    // Delete version from cache
+    // Delete a version from the cache
     $pluginsCache = (array)$cache->read('ougc_plugins');
 
     if (isset($pluginsCache['PrivateThreads'])) {
@@ -262,191 +253,181 @@ function pluginUninstall(): bool
     }
 
     $cache->delete('ougcPrivateThreadsAlerts');
+}
 
-    return true;
+function pluginLibraryLoad($checkRequirements = true): void
+{
+	global $PL, $lang;
+
+	loadLanguage();
+
+	if ($fileExists = file_exists(PLUGINLIBRARY)) {
+		global $PL;
+
+		$PL or require_once PLUGINLIBRARY;
+	}
+
+	if ($checkRequirements) {
+		$pluginLibraryInformation = pluginLibraryInformation();
+
+		if (!$fileExists || $PL->version < $pluginLibraryInformation->version) {
+			flash_message(
+				$lang->sprintf(
+					$lang->ougcPrivateThreadsPluginLibrary,
+					$pluginLibraryInformation->url,
+					$pluginLibraryInformation->version
+				),
+				'error'
+			);
+
+			admin_redirect('index.php?module=config-plugins');
+		}
+	}
 }
 
 function dbTables(): array
 {
-    $tablesData = [];
+	$tablesData = [];
 
-    foreach (TABLES_DATA as $tableName => $fieldsData) {
-        foreach ($fieldsData as $fieldName => $fieldData) {
-            $fieldDefinition = '';
+	foreach (TABLES_DATA as $tableName => $tableColumns) {
+		foreach ($tableColumns as $fieldName => $fieldData) {
+			if (!isset($fieldData['type'])) {
+				continue;
+			}
 
-            if (!isset($fieldData['type'])) {
-                continue;
-            }
+			$tablesData[$tableName][$fieldName] = dbBuildFieldDefinition($fieldData);
+		}
 
-            $fieldDefinition .= $fieldData['type'];
+		foreach ($tableColumns as $fieldName => $fieldData) {
+			if (isset($fieldData['primary_key'])) {
+				$tablesData[$tableName]['primary_key'] = $fieldName;
+			}
 
-            if (isset($fieldData['size'])) {
-                $fieldDefinition .= "({$fieldData['size']})";
-            }
+			if ($fieldName === 'unique_key') {
+				$tablesData[$tableName]['unique_key'] = $fieldData;
+			}
+		}
+	}
 
-            if (isset($fieldData['unsigned'])) {
-                if ($fieldData['unsigned'] === true) {
-                    $fieldDefinition .= ' UNSIGNED';
-                } else {
-                    $fieldDefinition .= ' SIGNED';
-                }
-            }
-
-            if (!isset($fieldData['null'])) {
-                $fieldDefinition .= ' NOT';
-            }
-
-            $fieldDefinition .= ' NULL';
-
-            if (isset($fieldData['auto_increment'])) {
-                $fieldDefinition .= ' AUTO_INCREMENT';
-            }
-
-            if (isset($fieldData['default'])) {
-                $fieldDefinition .= " DEFAULT '{$fieldData['default']}'";
-            }
-
-            $tablesData[$tableName][$fieldName] = $fieldDefinition;
-        }
-
-        foreach ($fieldsData as $fieldName => $fieldData) {
-            if (isset($fieldData['primary_key'])) {
-                $tablesData[$tableName]['primary_key'] = $fieldName;
-            }
-            if ($fieldName === 'unique_key') {
-                $tablesData[$tableName]['unique_key'] = $fieldData;
-            }
-        }
-    }
-
-    return $tablesData;
+	return $tablesData;
 }
 
-function dbVerifyTables(): bool
+function dbVerifyTables(): array
 {
-    global $db;
+	global $db;
 
-    $dbCollation = $db->build_create_table_collation();
+	$collation = $db->build_create_table_collation();
 
-    $tablePrefix = $db->table_prefix;
+	foreach (dbTables() as $tableName => $tableColumns) {
+		if ($db->table_exists($tableName)) {
+			foreach ($tableColumns as $fieldName => $fieldData) {
+				if ($fieldName === 'primary_key' || $fieldName === 'unique_key') {
+					continue;
+				}
 
-    foreach (dbTables() as $tableName => $tableData) {
-        if ($db->table_exists($tableName)) {
-            foreach ($tableData as $fieldName => $fieldData) {
-                if ($fieldName == 'primary_key' || $fieldName == 'unique_key') {
-                    continue;
-                }
+				if ($db->field_exists($fieldName, $tableName)) {
+					$db->modify_column($tableName, "`{$fieldName}`", $fieldData);
+				} else {
+					$db->add_column($tableName, $fieldName, $fieldData);
+				}
+			}
+		} else {
+			$query_string = "CREATE TABLE IF NOT EXISTS `{$db->table_prefix}{$tableName}` (";
 
-                if ($db->field_exists($fieldName, $tableName)) {
-                    $db->modify_column($tableName, "`{$fieldName}`", $fieldData);
-                } else {
-                    $db->add_column($tableName, $fieldName, $fieldData);
-                }
-            }
-        } else {
-            $queryString = "CREATE TABLE IF NOT EXISTS `{$tablePrefix}{$tableName}` (";
+			foreach ($tableColumns as $fieldName => $fieldData) {
+				if ($fieldName === 'primary_key') {
+					$query_string .= "PRIMARY KEY (`{$fieldData}`)";
+				} elseif ($fieldName !== 'unique_key') {
+					$query_string .= "`{$fieldName}` {$fieldData},";
+				}
+			}
 
-            foreach ($tableData as $fieldName => $fieldData) {
-                if ($fieldName == 'primary_key') {
-                    $queryString .= "PRIMARY KEY (`{$fieldData}`)";
-                } elseif ($fieldName !== 'unique_key') {
-                    $queryString .= "`{$fieldName}` {$fieldData},";
-                }
-            }
+			$query_string .= ") ENGINE=MyISAM{$collation};";
 
-            $queryString .= ") ENGINE=MyISAM{$dbCollation};";
+			$db->write_query($query_string);
+		}
+	}
 
-            $db->write_query($queryString);
-        }
-    }
-
-    dbVerifyIndexes();
-
-    return true;
+	dbVerifyIndexes();
 }
 
-function dbVerifyIndexes(): bool
+function dbVerifyIndexes(): void
 {
-    global $db;
+	global $db;
 
-    $tablePrefix = $db->table_prefix;
+	foreach (dbTables() as $tableName => $tableColumns) {
+		if (!$db->table_exists($tableName)) {
+			continue;
+		}
 
-    foreach (dbTables() as $tableName => $tableData) {
-        if (!$db->table_exists($tableName)) {
-            continue;
-        }
+		if (isset($tableColumns['unique_key'])) {
+			foreach ($tableColumns['unique_key'] as $key_name => $key_value) {
+				if ($db->index_exists($tableName, $key_name)) {
+					continue;
+				}
 
-        if (isset($tableData['unique_key'])) {
-            foreach ($tableData['unique_key'] as $keyName => $keyValue) {
-                if ($db->index_exists($tableName, $keyName)) {
-                    continue;
-                }
-
-                $db->write_query("ALTER TABLE {$tablePrefix}{$tableName} ADD UNIQUE KEY {$keyName} ({$keyValue})");
-            }
-        }
-    }
-
-    return true;
+				$db->write_query(
+					"ALTER TABLE {$db->table_prefix}{$tableName} ADD UNIQUE KEY {$key_name} ({$key_value})"
+				);
+			}
+		}
+	}
 }
 
-function dbVerifyColumns(): bool
+function dbVerifyColumns(): void
 {
-    global $db;
+	global $db;
 
-    $tablesData = [];
+	foreach (FIELDS_DATA as $tableName => $tableColumns) {
+		if (!$db->table_exists($tableName)) {
+			continue;
+		}
 
-    foreach (FIELDS_DATA as $tableName => $fieldsData) {
-        foreach ($fieldsData as $fieldName => $fieldData) {
-            $fieldDefinition = '';
+		foreach ($tableColumns as $fieldName => $fieldData) {
+			if (!isset($fieldData['type'])) {
+				continue;
+			}
 
-            if (!isset($fieldData['type'])) {
-                continue;
-            }
+			if ($db->field_exists($fieldName, $tableName)) {
+				$db->modify_column($tableName, "`{$fieldName}`", dbBuildFieldDefinition($fieldData));
+			} else {
+				$db->add_column($tableName, $fieldName, dbBuildFieldDefinition($fieldData));
+			}
+		}
+	}
+}
 
-            $fieldDefinition .= $fieldData['type'];
+function dbBuildFieldDefinition(array $fieldData): string
+{
+	$field_definition = '';
 
-            if (isset($fieldData['size'])) {
-                $fieldDefinition .= "({$fieldData['size']})";
-            }
+	$field_definition .= $fieldData['type'];
 
-            if (isset($fieldData['unsigned'])) {
-                if ($fieldData['unsigned'] === true) {
-                    $fieldDefinition .= ' UNSIGNED';
-                } else {
-                    $fieldDefinition .= ' SIGNED';
-                }
-            }
+	if (isset($fieldData['size'])) {
+		$field_definition .= "({$fieldData['size']})";
+	}
 
-            if (!isset($fieldData['null'])) {
-                $fieldDefinition .= ' NOT';
-            }
+	if (isset($fieldData['unsigned'])) {
+		if ($fieldData['unsigned'] === true) {
+			$field_definition .= ' UNSIGNED';
+		} else {
+			$field_definition .= ' SIGNED';
+		}
+	}
 
-            $fieldDefinition .= ' NULL';
+	if (!isset($fieldData['null'])) {
+		$field_definition .= ' NOT';
+	}
 
-            if (isset($fieldData['auto_increment'])) {
-                $fieldDefinition .= ' AUTO_INCREMENT';
-            }
+	$field_definition .= ' NULL';
 
-            if (isset($fieldData['default'])) {
-                $fieldDefinition .= " DEFAULT '{$fieldData['default']}'";
-            }
+	if (isset($fieldData['auto_increment'])) {
+		$field_definition .= ' AUTO_INCREMENT';
+	}
 
-            $tablesData[$tableName][$fieldName] = $fieldDefinition;
-        }
+	if (isset($fieldData['default'])) {
+		$field_definition .= " DEFAULT '{$fieldData['default']}'";
+	}
 
-        foreach ($tablesData as $tableName => $fieldsData) {
-            if ($db->table_exists($tableName)) {
-                foreach ($fieldsData as $fieldName => $fieldDefinition) {
-                    if ($db->field_exists($fieldName, $tableName)) {
-                        $db->modify_column($tableName, "`{$fieldName}`", $fieldDefinition);
-                    } else {
-                        $db->add_column($tableName, $fieldName, $fieldDefinition);
-                    }
-                }
-            }
-        }
-    }
-
-    return true;
+	return $field_definition;
 }

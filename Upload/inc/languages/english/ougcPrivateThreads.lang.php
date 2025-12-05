@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/languages/english/ougcPrivateThreads.lang.php)
+ *    ougc Private Thread plugin (/inc/languages/english/ougcPrivateThreads.lang.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -27,7 +27,7 @@
  ****************************************************************************/
 
 $l = [
-    'ougcPrivateThreads' => 'OUGC Private Threads',
+    'ougcPrivateThreads' => 'ougc Private Thread',
 
     'ougcPrivateThreadsFormTitle' => 'Private Thread',
     'ougcPrivateThreadsFormTitleDescription' => 'Optionally you may mark this thread as private to be visible by specific users and moderators.',

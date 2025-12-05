@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/plugins/ougc/PrivateThreads/admin_hooks.php)
+ *    ougc Private Thread plugin (/inc/plugins/ougc/PrivateThreads/admin_hooks.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -32,20 +32,20 @@ namespace ougc\PrivateThreads\Hooks\Admin;
 
 use MyBB;
 
-use function ougc\PrivateThreads\Core\load_language;
+use function ougc\PrivateThreads\Core\loadLanguage;
 use function ougc\PrivateThreads\MyAlerts\getAvailableLocations;
 use function ougc\PrivateThreads\MyAlerts\installLocation;
 use function ougc\PrivateThreads\MyAlerts\MyAlertsIsIntegrable;
 
-function admin_config_plugins_begin01(): bool
+function admin_config_plugins_begin01(): void
 {
-    global $mybb, $lang, $page, $db;
+    global $mybb, $lang, $page;
 
     if ($mybb->get_input('action') !== 'ougcPrivateThreads') {
-        return false;
+		return;
     }
 
-    load_language();
+	loadLanguage();
 
     if ($mybb->get_input('no') || !MyAlertsIsIntegrable()) {
         admin_redirect('index.php?module=config-plugins');
@@ -67,11 +67,9 @@ function admin_config_plugins_begin01(): bool
     flash_message($lang->ougcPrivateThreads_myalerts_success, 'success');
 
     admin_redirect('index.php?module=config-plugins');
-
-    return true;
 }
 
-function admin_config_plugins_deactivate(): bool
+function admin_config_plugins_deactivate(): void
 {
     global $mybb, $page;
 
@@ -80,7 +78,7 @@ function admin_config_plugins_deactivate(): bool
         $mybb->get_input('plugin') != 'ougcPrivateThreads' ||
         !$mybb->get_input('uninstall', MyBB::INPUT_INT)
     ) {
-        return false;
+		return;
     }
 
     if ($mybb->request_method != 'post') {
@@ -92,6 +90,4 @@ function admin_config_plugins_deactivate(): bool
     if ($mybb->get_input('no')) {
         admin_redirect('index.php?module=config-plugins');
     }
-
-    return true;
 }

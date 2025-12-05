@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/plugins/ougcPrivateThreads.php)
+ *    ougc Private Thread plugin (/inc/plugins/ougcPrivateThreads.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -28,20 +28,14 @@
 
 declare(strict_types=1);
 
-use function ougc\PrivateThreads\Admin\pluginInfo;
-use function ougc\PrivateThreads\Admin\pluginActivate;
-use function ougc\PrivateThreads\Admin\pluginDeactivate;
 use function ougc\PrivateThreads\Admin\pluginInformation;
+use function ougc\PrivateThreads\Admin\pluginActivate;
 use function ougc\PrivateThreads\Admin\pluginInstall;
 use function ougc\PrivateThreads\Admin\pluginIsInstalled;
 use function ougc\PrivateThreads\Admin\pluginUninstall;
 use function ougc\PrivateThreads\Core\addHooks;
-use function ougc\PrivateThreads\Core\loadLanguage;
-
 use function ougc\PrivateThreads\MyAlerts\initLocations;
-
 use function ougc\PrivateThreads\MyAlerts\initMyalerts;
-
 use function ougc\PrivateThreads\MyAlerts\MyAlertsIsIntegrable;
 
 use const ougc\PrivateThreads\ROOT;
@@ -86,19 +80,14 @@ function ougcPrivateThreads_info(): array
     return pluginInformation();
 }
 
-function ougcPrivateThreads_activate(): bool
+function ougcPrivateThreads_activate(): void
 {
-    return pluginActivate();
+    pluginActivate();
 }
 
-function ougcPrivateThreads_deactivate(): bool
+function ougcPrivateThreads_install(): void
 {
-    return pluginDeactivate();
-}
-
-function ougcPrivateThreads_install(): bool
-{
-    return pluginInstall();
+    pluginInstall();
 }
 
 function ougcPrivateThreads_is_installed(): bool
@@ -106,9 +95,9 @@ function ougcPrivateThreads_is_installed(): bool
     return pluginIsInstalled();
 }
 
-function ougcPrivateThreads_uninstall(): bool
+function ougcPrivateThreads_uninstall(): void
 {
-    return pluginUninstall();
+    pluginUninstall();
 }
 
 // control_object by Zinga Burga from MyBBHacks ( mybbhacks.zingaburga.com )

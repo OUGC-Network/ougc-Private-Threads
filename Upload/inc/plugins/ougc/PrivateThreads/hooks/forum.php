@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/plugins/ougc/PrivateThreads/forum_hooks.php)
+ *    ougc Private Thread plugin (/inc/plugins/ougc/PrivateThreads/forum_hooks.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -32,9 +32,7 @@ namespace ougc\PrivateThreads\Hooks\Forum;
 
 use DataHandler;
 use MyBB;
-
 use MyLanguage;
-
 use postParser;
 
 use function ougc\PrivateThreads\Core\buildWhereClauses;
@@ -47,9 +45,9 @@ use function ougc\PrivateThreads\Core\loadLanguage;
 use function ougc\PrivateThreads\Core\sendAlert;
 use function ougc\PrivateThreads\Core\sendPrivateMessage;
 use function ougc\PrivateThreads\MyAlerts\myalertsIsIntegrable;
-use function ougc\PrivateThreads\MyAlerts\registerMyalertsFormatters;
+use function ougc\PrivateThreads\MyAlerts\registerMyAlertsFormatters;
 
-function global_start(): bool
+function global_start(): void
 {
     global $templatelist, $mybb;
 
@@ -63,40 +61,34 @@ function global_start(): bool
 
     switch (constant('THIS_SCRIPT')) {
         case 'showthread.php':
-            $templatelist .= ', ';
+            $templatelist .= ', ougcPrivateThreads_showThreadUserList, ougcPrivateThreads_showThreadUserListItem';
             break;
         case 'editpost.php':
         case 'newthread.php':
-            $templatelist .= ', ';
+            $templatelist .= ', ougcPrivateThreads_form';
             break;
-        case 'forumdisplay.php':
-            $templatelist .= ', ';
+		case 'forumdisplay.php':
+		case 'search.php':
+            $templatelist .= ', ougcPrivateThreads_prefix, ougcPrivateThreads_search';
             break;
     }
 
     if (myalertsIsIntegrable() && !empty($mybb->user['uid'])) {
-        registerMyalertsFormatters();
+        registerMyAlertsFormatters();
     }
-    /*global $cache;
-    $cache->update_most_replied_threads();
-    $cache->update_most_viewed_threads();*/
-
-    return true;
 }
 
-function myalerts_load_lang(): bool
+function myalerts_load_lang(): void
 {
     loadLanguage();
-
-    return true;
 }
 
 // moderator permission: ok
 // forums permissions: ok
 // groups permissions: ok
-function newthread_end(): bool
+function newthread_end(): void
 {
-    global $mybb, $fid, $bgcolor2, $ougcPrivateThreadsRow, $templates, $lang, $thread, $plugins, $db, $post;
+    global $mybb, $fid, $bgcolor2, $ougcPrivateThreadsRow, $lang, $thread, $plugins, $db, $post;
 
     $ougcPrivateThreadsRow = '';
 
@@ -105,7 +97,7 @@ function newthread_end(): bool
     $forumID = (int)$fid;
 
     if (!isAllowedForum($forumID, false)) {
-        return false;
+		return;
     }
 
     $mybb->user['uid'] = (int)$mybb->user['uid'];
@@ -124,7 +116,7 @@ function newthread_end(): bool
         $postID = !empty($post['pid']) ? (int)$post['pid'] : 0;
 
         if ($firstPostID !== $postID || !getSetting('allowStatusUpdate') && !$isPrivateThread) {
-            return false;
+			return;
         }
 
         if (
@@ -134,10 +126,8 @@ function newthread_end(): bool
             error_no_permission();
         }
     } elseif (!allowedGroup()) {
-        return false;
+		return;
     }
-
-    $groupsCache = $mybb->cache->read('usergroups');
 
     loadLanguage();
 
@@ -189,16 +179,14 @@ function newthread_end(): bool
     }
 
     $ougcPrivateThreadsRow = eval(getTemplate('form'));
-
-    return true;
 }
 
 // moderator permission: ok
 // forums permissions: ok
 // groups permissions: ok
-function editpost_end(): bool
+function editpost_end(): void
 {
-    return newthread_end();
+    newthread_end();
 }
 
 // moderator permission: ok
@@ -310,7 +298,7 @@ function datahandler_post_validate_post(DataHandler &$dataHandler): DataHandler
 // groups permissions: ok
 function datahandler_post_insert_thread(DataHandler &$dataHandler): DataHandler
 {
-    global $mybb, $plugins;
+    global $plugins;
 
     $isThreadUpdate = $plugins->current_hook === 'datahandler_post_update_thread';
 
@@ -509,7 +497,7 @@ function datahandler_post_update_thread(DataHandler &$dataHandler): DataHandler
 // forums permissions: ok
 function build_forumbits_forum(array &$forumData): array
 {
-    global $mybb, $plugins, $fcache, $db;
+    global $fcache, $db;
 
     if (!(
         isAllowedForum() &&
@@ -569,7 +557,7 @@ function build_forumbits_forum(array &$forumData): array
             while ($threadData = $db->fetch_array($dbQuery)) {
                 $forumID = (int)$threadData['fid'];
 
-                if (!$forumCache[$forumID]) {
+                if (empty($forumCache[$forumID])) {
                     unset($forumsToProcess[$forumID]);
 
                     $forumCache[$forumID] = $threadData;
@@ -637,7 +625,7 @@ $forum = $plugins->run_hooks("ougcPrivateThreads_build_forumbits_forum", $forum)
 */
 function ougcPrivateThreads_build_forumbits_forum(array &$forumData): array
 {
-    global $mybb, $fcache, $db;
+    global $fcache, $db;
 
     $dbQuery = $db->simple_select('forums', '*', 'active != 0');
 
@@ -653,14 +641,14 @@ function ougcPrivateThreads_build_forumbits_forum(array &$forumData): array
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function forumdisplay_start(): bool
+function forumdisplay_start(): void
 {
-    global $db, $mybb;
+    global $mybb;
 
     $forumID = $mybb->get_input('fid', MyBB::INPUT_INT);
 
     if (!isAllowedForum($forumID)) {
-        return false;
+		return;
     }
 
     /**--**/
@@ -669,7 +657,7 @@ function forumdisplay_start(): bool
     $forumPermissions = $forumPermissionsCache[$forumID];
 
     if (!$forumPermissions['canviewthreads']) {
-        return false;
+		return;
     }
 
     $visibleStates = [1];
@@ -716,17 +704,15 @@ function forumdisplay_start(): bool
 			}
 		'
     );
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
 // groups permissions: ok
-function forumdisplay_get_threads(): bool
+function forumdisplay_get_threads(): void
 {
-    global $tvisibleonly, $db, $mybb, $fid;
+    global $tvisibleonly, $fid;
 
     $forumID = (int)$fid;
 
@@ -735,14 +721,12 @@ function forumdisplay_get_threads(): bool
 
         $tvisibleonly .= " AND {$whereClauses}";
     }
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function showthread_start(): bool
+function showthread_start(): void
 {
     global $thread, $mybb;
 
@@ -756,7 +740,7 @@ function showthread_start(): bool
         (int)$thread['uid'] == $mybb->user['uid'] ||
         my_strpos(',' . $thread['ougcPrivateThreads_userIDs'] . ',', ',' . $mybb->user['uid'] . ',') !== false
     ) {
-        return false;
+		return;
     }
 
     if (function_exists('archive_error_no_permission')) {
@@ -764,19 +748,17 @@ function showthread_start(): bool
     }
 
     error_no_permission();
-
-    return false;
 }
 
 // forums permissions: ok
-function showthread_end(): bool
+function showthread_end(): void
 {
-    global $mybb, $thread, $db, $lang, $templates, $theme, $ougcPrivateThreadsAllowedUsersList;
+    global $thread, $db, $lang, $theme, $ougcPrivateThreadsAllowedUsersList;
 
     $ougcPrivateThreadsAllowedUsersList = /*$ougcPrivateThreadsButton = */
         '';
 
-    $thread['fisrtpost'] = (int)$thread['fisrtpost'];
+    $thread['firstpost'] = (int)$thread['firstpost'];
 
     $forumID = (int)$thread['fid'];
 
@@ -785,7 +767,7 @@ function showthread_end(): bool
         !empty($thread['ougcPrivateThreads_isPrivateThread']) &&
         getSetting('showUserList')
     )) {
-        return false;
+		return;
     }
 
     loadLanguage();
@@ -825,23 +807,21 @@ function showthread_end(): bool
     if ($allowedUsersList) {
         $ougcPrivateThreadsAllowedUsersList = eval(getTemplate('showThreadUserList'));
     }
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function newreply_start(): bool
+function newreply_start(): void
 {
-    global $thread, $mybb, $db, $plugins;
+    global $plugins;
 
     showthread_start();
 
     // The following code deals with quotes
 
     if (!isAllowedForum() || $plugins->current_hook !== 'newreply_start') {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -863,47 +843,39 @@ function newreply_start(): bool
 		}
 	'
     );
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function newreply_do_newreply_start(): bool
+function newreply_do_newreply_start(): void
 {
     newreply_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function xmlhttp_get_multiquoted_intermediate(): bool
+function xmlhttp_get_multiquoted_intermediate(): void
 {
-    global $unviewable_forums, $mybb, $inactiveforums;
+    global $unviewable_forums;
 
     if (!isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses();
 
     $unviewable_forums .= ' AND ' . $whereClauses;
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function syndication_start(): bool
+function syndication_start(): void
 {
-    global $db, $mybb;
-
     if (!isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses(false);
@@ -925,19 +897,17 @@ function syndication_start(): bool
 		}
 	'
     );
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function portal_start(): bool
+function portal_start(): void
 {
-    global $db, $settings;
+    global $settings;
 
     if (!isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -993,19 +963,17 @@ function portal_start(): bool
 		'
         );
     }
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function archive_start(): bool
+function archive_start(): void
 {
-    global $db, $mybb, $action;
+    global $action;
 
     if ($action !== 'forum' || !isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses(false);
@@ -1036,64 +1004,52 @@ function archive_start(): bool
 		}
 	'
     );
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function printthread_start(): bool
+function printthread_start(): void
 {
     showthread_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function sendthread_do_sendtofriend_start(): bool
+function sendthread_do_sendtofriend_start(): void
 {
     showthread_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function sendthread_start(): bool
+function sendthread_start(): void
 {
     showthread_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function ratethread_start(): bool
+function ratethread_start(): void
 {
     showthread_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function archive_thread_start(): bool
+function archive_thread_start(): void
 {
     showthread_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function attachment_start(): bool
+function attachment_start(): void
 {
     global $attachment, $thread;
 
@@ -1102,23 +1058,21 @@ function attachment_start(): bool
     $thread = get_thread($postData['tid']);
 
     if (empty($thread)) {
-        return false;
+		return;
     }
 
     showthread_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function report_type(): bool
+function report_type(): void
 {
-    global $report_type, $post, $thread, $mybb, $error, $lang;
+    global $report_type, $post, $mybb, $error, $lang;
 
     if ($report_type !== 'post') {
-        return false;
+		return;
     }
 
     $mybb->user['uid'] = (int)$mybb->user['uid'];
@@ -1133,48 +1087,42 @@ function report_type(): bool
         (int)$threadData['uid'] == $mybb->user['uid'] ||
         my_strpos(',' . $threadData['ougcPrivateThreads_userIDs'] . ',', ',' . $mybb->user['uid'] . ',') !== false
     ) {
-        return false;
+		return;
     }
 
     $error = $lang->sprintf($lang->error_invalid_report, $report_type);
     //showthread_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function reputation_do_add_start(): bool
+function reputation_do_add_start(): void
 {
     global $thread;
 
     if (!empty($thread['tid'])) {
         showthread_start();
     }
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function reputation_add_start(): bool
+function reputation_add_start(): void
 {
     reputation_do_add_start();
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function reputation_start(): bool
+function reputation_start(): void
 {
-    global $mybb, $db;
+    global $mybb;
 
     if ($mybb->get_input('action') || !isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1196,19 +1144,17 @@ function reputation_start(): bool
 		}
 	'
     );
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function usercp_notepad_end(): bool
+function usercp_notepad_end(): void
 {
-    global $mybb, $db;
+    global $mybb;
 
     if ($mybb->get_input('action') || !isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1230,19 +1176,15 @@ function usercp_notepad_end(): bool
 		}
 	'
     );
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function usercp_subscriptions_start(): bool
+function usercp_subscriptions_start(): void
 {
-    global $mybb, $db;
-
     if (!isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1273,19 +1215,17 @@ function usercp_subscriptions_start(): bool
 		}
 	'
     );
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function usercp_attachments_start(): bool
+function usercp_attachments_start(): void
 {
     global $db, $mybb;
 
     if (!isAllowedForum()) {
-        return false;
+		return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1325,19 +1265,17 @@ function usercp_attachments_start(): bool
 		}
 	'
     );
-
-    return true;
 }
 
 
-function usercp_do_attachments_start(): bool
+function usercp_do_attachments_start(): void
 {
-    global $mybb, $db, $thread;
+    global $mybb, $db;
 
     $attachmentIDs = implode(',', array_map('intval', $mybb->get_input('attachments', MyBB::INPUT_ARRAY)));
 
     if (!$attachmentIDs) {
-        return false;
+		return;
     }
 
     $dbQuery = $db->simple_select(
@@ -1355,33 +1293,29 @@ function usercp_do_attachments_start(): bool
             showthread_start();
         }
     }
-
-    return true;
 }
 
-function search_end(): bool
+function search_end(): void
 {
-    global $ougcPrivateThreadsSearch, $mybb, $templates, $lang;
+    global $ougcPrivateThreadsSearch, $lang;
 
     $ougcPrivateThreadsSearch = '';
 
     if (!isAllowedForum(0, false) || !is_member(
             getSetting('enableSearchSystem')
         )) {
-        return false;
+		return;
     }
 
     loadLanguage();
 
     $ougcPrivateThreadsSearch = eval(getTemplate('search'));
-
-    return true;
 }
 
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function search_do_search_process(): bool
+function search_do_search_process(): void
 {
     global $searcharray, $db, $mybb;
 
@@ -1402,7 +1336,7 @@ function search_do_search_process(): bool
     }
 
     if (!$whereClauses) {
-        return false;
+		return;
     }
 
     $whereClauses = implode(' AND ', $whereClauses);
@@ -1430,13 +1364,11 @@ function search_do_search_process(): bool
     }
 
     $searcharray['querycache'] .= $db->escape_string($whereClauses);
-
-    return true;
 }
 
-function search_results_start(): bool
+function search_results_start(): void
 {
-    global $settings, $search, $db;
+    global $search;
 
     if (isAllowedForum(0, false) && getSetting('prefixClassName')) {
         global $templates;
@@ -1473,13 +1405,11 @@ function search_results_start(): bool
             $templates->cache['search_results_posts_inlinecheck']
         );
     }
-
-    return true;
 }
 
-function search_results_thread(&$postData = null): bool
+function search_results_thread(&$postData = null): void
 {
-    global $bgcolor, $mybb, $inline_mod_checkbox, $lang, $templates;
+    global $bgcolor, $inline_mod_checkbox, $lang;
 
     if (is_array($postData)) {
         $thread = &$postData;
@@ -1498,7 +1428,7 @@ function search_results_thread(&$postData = null): bool
     }
 
     if (!getSetting('prefixClassName')) {
-        return false;
+		return;
     }
 
     $styleClassName = '';
@@ -1518,22 +1448,16 @@ function search_results_thread(&$postData = null): bool
             $inline_mod_checkbox
         );
     }
-
-    return true;
 }
 
-function search_results_post(): bool
+function search_results_post(): void
 {
     global $post;
 
     search_results_thread($post);
-
-    return true;
 }
 
-function forumdisplay_thread(): bool
+function forumdisplay_thread(): void
 {
     search_results_thread();
-
-    return true;
 }

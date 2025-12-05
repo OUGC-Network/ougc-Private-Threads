@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/plugins/ougc/PrivateThreads/myalerts.php)
+ *    ougc Private Thread plugin (/inc/plugins/ougc/PrivateThreads/myalerts.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -32,15 +32,12 @@ namespace ougc\PrivateThreads\MyAlerts;
 
 use MybbStuff_Core_ClassLoader;
 use MybbStuff_MyAlerts_AlertFormatterManager;
-
 use MybbStuff_MyAlerts_AlertTypeManager;
-
 use MybbStuff_MyAlerts_Entity_AlertType;
 
-use const GLOB_ONLYDIR;
 use const ougc\PrivateThreads\ROOT;
 
-function getAvailableLocations()
+function getAvailableLocations(): array
 {
     $directoryContents = ROOT . '/myalerts/';
 
@@ -50,7 +47,7 @@ function getAvailableLocations()
     );
 }
 
-function getInstalledLocations()
+function getInstalledLocations(): array
 {
     global $cache;
 
@@ -68,9 +65,9 @@ function isLocationAlertTypePresent(string $locationName): bool
     return false;
 }
 
-function installLocation(string $locationName): bool
+function installLocation(string $locationName): void
 {
-    global $db, $cache;
+    global $cache;
 
     $cacheEntry = $cache->read('ougcPrivateThreadsAlerts');
 
@@ -89,11 +86,9 @@ function installLocation(string $locationName): bool
 
         $alertTypeManager->add($alertType);
     }
-
-    return true;
 }
 
-function uninstallLocation(string $locationName): bool
+function uninstallLocation(string $locationName): void
 {
     global $cache;
 
@@ -110,11 +105,9 @@ function uninstallLocation(string $locationName): bool
         unset($cacheEntry['MyAlertLocationsInstalled'][$key]);
         $cache->update('ougcPrivateThreadsAlerts', $cacheEntry);
     }
-
-    return true;
 }
 
-function initMyalerts(): bool
+function initMyalerts(): void
 {
     defined('MYBBSTUFF_CORE_PATH') || define(
         'MYBBSTUFF_CORE_PATH',
@@ -133,20 +126,16 @@ function initMyalerts(): bool
     $classLoader->registerNamespace('MybbStuff_MyAlerts', [MYALERTS_PLUGIN_PATH . '/src']);
 
     $classLoader->register();
-
-    return true;
 }
 
-function initLocations(): bool
+function initLocations(): void
 {
     foreach (getInstalledLocations() as $locationName) {
         require_once ROOT . '/myalerts/' . $locationName . '/init.php';
     }
-
-    return true;
 }
 
-function registerMyalertsFormatters(): bool
+function registerMyAlertsFormatters(): void
 {
     global $mybb, $lang, $formatterManager;
 
@@ -161,11 +150,9 @@ function registerMyalertsFormatters(): bool
 
         $formatterManager->registerFormatter($formatter);
     }
-
-    return true;
 }
 
-function MyAlertsIsIntegrable()
+function MyAlertsIsIntegrable(): bool
 {
     global $cache;
 

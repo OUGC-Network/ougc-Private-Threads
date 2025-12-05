@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/plugins/ougc/PrivateThreads/core.php)
+ *    ougc Private Thread plugin (/inc/plugins/ougc/PrivateThreads/core.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -36,8 +36,6 @@ use stdClass;
 
 use function ougc\PrivateThreads\Admin\pluginInformation;
 
-use const ougc\PrivateThreads\Core\SETTINGS;
-use const ougc\PrivateThreads\Core\DEBUG;
 use const ougc\PrivateThreads\ROOT;
 
 const TABLES_DATA = [
@@ -57,13 +55,11 @@ const FIELDS_DATA = [
     ]
 ];
 
-function loadLanguage(): bool
+function loadLanguage(): void
 {
     global $lang;
 
     isset($lang->ougcPrivateThreads) || $lang->load('ougcPrivateThreads');
-
-    return true;
 }
 
 function pluginLibraryInformation(): stdClass
@@ -71,39 +67,7 @@ function pluginLibraryInformation(): stdClass
     return (object)pluginInformation()['pl'];
 }
 
-function pluginLibraryLoad($checkRequirements = true): bool
-{
-    global $PL, $lang;
-
-    loadLanguage();
-
-    if ($fileExists = file_exists(PLUGINLIBRARY)) {
-        global $PL;
-
-        $PL or require_once PLUGINLIBRARY;
-    }
-
-    if ($checkRequirements) {
-        $pluginLibraryInformation = pluginLibraryInformation();
-
-        if (!$fileExists || $PL->version < $pluginLibraryInformation->version) {
-            flash_message(
-                $lang->sprintf(
-                    $lang->ougcPrivateThreadsPluginLibrary,
-                    $pluginLibraryInformation->url,
-                    $pluginLibraryInformation->version
-                ),
-                'error'
-            );
-
-            admin_redirect('index.php?module=config-plugins');
-        }
-    }
-
-    return true;
-}
-
-function addHooks(string $namespace): bool
+function addHooks(string $namespace): void
 {
     global $plugins;
 
@@ -127,17 +91,15 @@ function addHooks(string $namespace): bool
             $plugins->add_hook($hookName, $callable, $priority);
         }
     }
-
-    return true;
 }
 
 function getSetting(string $settingKey = '')
 {
     global $mybb;
 
-    return isset(SETTINGS[$settingKey]) ? SETTINGS[$settingKey] : (
-    isset($mybb->settings['ougcPrivateThreads_' . $settingKey]) ? $mybb->settings['ougcPrivateThreads_' . $settingKey] : false
-    );
+    return SETTINGS[$settingKey] ?? (
+		$mybb->settings['ougcPrivateThreads_' . $settingKey] ?? false
+	);
 }
 
 function getTemplateName(string $templateName = ''): string
@@ -160,7 +122,7 @@ function getTemplate(string $templateName = '', bool $enableHTMLComments = true)
 
         $templateContents = file_get_contents($filePath);
 
-        $templates->cache[\ougc\ougcPrivateThreads\Core\getTemplateName($templateName)] = $templateContents;
+        $templates->cache[getTemplateName($templateName)] = $templateContents;
     } elseif (my_strpos($templateName, '/') !== false) {
         $templateName = substr($templateName, strpos($templateName, '/') + 1);
     }
@@ -238,8 +200,6 @@ function buildWhereClauses(bool $fieldsPrefix = true, int $userID = 0): string
 
 function isAllowedForum(int $forumID = 0, bool $verifyModeratorPermission = true): bool
 {
-    global $mybb;
-
     if (!getSetting('enabledForums') || ($verifyModeratorPermission && is_member(getSetting('allowGroupsBypass')))) {
         return false;
     }
@@ -257,19 +217,19 @@ function isAllowedForum(int $forumID = 0, bool $verifyModeratorPermission = true
     return true;
 }
 
-// Send a Private Message to a user  (Copied from MyBB 1.7)
-function sendPrivateMessage(array $privateMessageData, int $fromUserID = 0, bool $adminOverride = false): bool
+// Send a Private Message to a user (Copied from MyBB 1.7)
+function sendPrivateMessage(array $privateMessageData, int $fromUserID = 0, bool $adminOverride = false): void
 {
     global $mybb;
 
-    $enabledNotificationTypes = array_flip(explode(',', getSettting('notificationTypes')));
+    $enabledNotificationTypes = array_flip(explode(',', getSetting('notificationTypes')));
 
     if (!isset($enabledNotificationTypes['pm']) || empty($mybb->settings['enablepms'])) {
-        return false;
+        return;
     }
 
     if (!$privateMessageData['subject'] || !$privateMessageData['message'] || (!$privateMessageData['receivepms'] && !$adminOverride)) {
-        return false;
+        return;
     }
 
     global $lang, $db, $session;
@@ -293,7 +253,7 @@ function sendPrivateMessage(array $privateMessageData, int $fromUserID = 0, bool
         'subject' => $privateMessageData['subject'],
         'message' => $privateMessageData['message'],
         'icon' => -1,
-        'fromid' => ($fromUserID == 0 ? (int)$mybb->user['uid'] : ($fromUserID < 0 ? 0 : $fromUserID)),
+        'fromid' => ($fromUserID == 0 ? (int)$mybb->user['uid'] : (max($fromUserID, 0))),
         'toid' => [$privateMessageData['touid']],
         'bccid' => [],
         'do' => '',
@@ -317,29 +277,25 @@ function sendPrivateMessage(array $privateMessageData, int $fromUserID = 0, bool
 
     if ($dataHandler->validate_pm()) {
         $dataHandler->insert_pm();
-
-        return true;
     }
-
-    return false;
 }
 
-function sendAlert(int $threadID, int $userID, int $authorID = 0): bool
+function sendAlert(int $threadID, int $userID, int $authorID = 0): void
 {
-    global $lang, $mybb, $alertType, $db;
+    global $alertType, $db;
 
     loadLanguage();
 
-    $enabledNotificationTypes = array_flip(explode(',', getSettting('notificationTypes')));
+    $enabledNotificationTypes = array_flip(explode(',', getSetting('notificationTypes')));
 
     if (!isset($enabledNotificationTypes['myalerts']) || !class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
-        return false;
+        return;
     }
 
     $alertType = MybbStuff_MyAlerts_AlertTypeManager::getInstance()->getByCode('ougcPrivateThreadsThread');
 
     if (!$alertType) {
-        return false;
+        return;
     }
 
     $query = $db->simple_select(
@@ -349,7 +305,7 @@ function sendAlert(int $threadID, int $userID, int $authorID = 0): bool
     );
 
     if ($db->fetch_field($query, 'id')) {
-        return false;
+        return;
     }
 
     if ($alertType->getEnabled()) {
@@ -369,8 +325,6 @@ function sendAlert(int $threadID, int $userID, int $authorID = 0): bool
 
         MybbStuff_MyAlerts_AlertManager::getInstance()->addAlert($alert);
     }
-
-    return true;
 }
 
 function isEnabledForum(int $forumID = 0): bool

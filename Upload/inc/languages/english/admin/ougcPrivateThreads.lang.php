@@ -2,7 +2,7 @@
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/languages/english/admin/ougcPrivateThreads.lang.php)
+ *    ougc Private Thread plugin (/inc/languages/english/admin/ougcPrivateThreads.lang.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -27,7 +27,7 @@
  ****************************************************************************/
 
 $l = [
-    'ougcPrivateThreads' => 'OUGC Private Threads',
+    'ougcPrivateThreads' => 'ougc Private Thread',
     'ougcPrivateThreadsDescription' => 'Allow users to mark individual threads as private to be visible for specific users only.',
     'ougcPrivateThreadsDescriptionMyAlerts' => '<br /><code><a href="./index.php?module=config-plugins&amp;action=ougcPrivateThreads">Install MyAlerts Integration</a></code>',
 

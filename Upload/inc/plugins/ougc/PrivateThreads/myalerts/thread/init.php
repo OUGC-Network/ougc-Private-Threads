@@ -4,7 +4,7 @@ use function ougc\PrivateThreads\Core\loadLanguage;
 
 /***************************************************************************
  *
- *    OUGC Private Threads plugin (/inc/plugins/ougc/PrivateThreads/myalerts/thread/init.php)
+ *    ougc Private Thread plugin (/inc/plugins/ougc/PrivateThreads/myalerts/thread/init.php)
  *    Author: Omar Gonzalez
  *    Copyright: © 2020 Omar Gonzalez
  *
@@ -55,11 +55,9 @@ class MybbStuff_MyAlerts_Formatter_ougcPrivateThreadsThreadFormatter extends
         );
     }
 
-    public function init(): bool
+    public function init(): void
     {
         loadLanguage();
-
-        return true;
     }
 
     public function buildShowLink(MybbStuff_MyAlerts_Entity_Alert $alert): string

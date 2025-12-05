@@ -4,7 +4,7 @@
     </a>
 </p>
 
-<h3 align="center">OUGC Private Threads</h3>
+<h3 align="center">ougc Private Thread</h3>
 
 <div align="center">
 
