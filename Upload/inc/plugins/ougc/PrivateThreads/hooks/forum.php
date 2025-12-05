@@ -30,12 +30,13 @@ declare(strict_types=1);
 
 namespace ougc\PrivateThreads\Hooks\Forum;
 
-use DataHandler;
+use PostDataHandler;
 use MyBB;
 use MyLanguage;
 use postParser;
 
 use function ougc\PrivateThreads\Core\buildWhereClauses;
+use function ougc\PrivateThreads\Core\control_db;
 use function ougc\PrivateThreads\Core\getSetting;
 use function ougc\PrivateThreads\Core\allowedGroup;
 use function ougc\PrivateThreads\Core\getTemplate;
@@ -67,8 +68,8 @@ function global_start(): void
         case 'newthread.php':
             $templatelist .= ', ougcPrivateThreads_form';
             break;
-		case 'forumdisplay.php':
-		case 'search.php':
+        case 'forumdisplay.php':
+        case 'search.php':
             $templatelist .= ', ougcPrivateThreads_prefix, ougcPrivateThreads_search';
             break;
     }
@@ -97,7 +98,7 @@ function newthread_end(): void
     $forumID = (int)$fid;
 
     if (!isAllowedForum($forumID, false)) {
-		return;
+        return;
     }
 
     $mybb->user['uid'] = (int)$mybb->user['uid'];
@@ -116,7 +117,7 @@ function newthread_end(): void
         $postID = !empty($post['pid']) ? (int)$post['pid'] : 0;
 
         if ($firstPostID !== $postID || !getSetting('allowStatusUpdate') && !$isPrivateThread) {
-			return;
+            return;
         }
 
         if (
@@ -126,7 +127,7 @@ function newthread_end(): void
             error_no_permission();
         }
     } elseif (!allowedGroup()) {
-		return;
+        return;
     }
 
     loadLanguage();
@@ -160,7 +161,8 @@ function newthread_end(): void
 
         $dbQuery = $db->simple_select('users', 'username', implode(' AND ', $whereClauses));
 
-        while ($userNamesList[] = htmlspecialchars_uni((string)$db->fetch_field($dbQuery, 'username'))) {
+        while ($userName = $db->fetch_field($dbQuery, 'username')) {
+            $userNamesList[] = htmlspecialchars_uni($userName);
         }
 
         $userNamesList = array_filter($userNamesList);
@@ -192,7 +194,7 @@ function editpost_end(): void
 // moderator permission: ok
 // forums permissions: ok
 // groups permissions: ok
-function datahandler_post_validate_thread(DataHandler &$dataHandler): DataHandler
+function datahandler_post_validate_thread(PostDataHandler &$dataHandler): PostDataHandler
 {
     global $mybb, $lang, $db, $plugins;
 
@@ -234,7 +236,7 @@ function datahandler_post_validate_thread(DataHandler &$dataHandler): DataHandle
         return $dataHandler;
     }
 
-    $dataHandler->ougcPrivateThreadsUsersList = '';
+    global $ougcPrivateThreadsMarkAsPrivateThread, $ougcPrivateThreadsUsersList;
 
     if ($isPrivateThread = $mybb->get_input('ougcPrivateThreadsFormCheckbox', MyBB::INPUT_INT)) {
         loadLanguage();
@@ -261,7 +263,8 @@ function datahandler_post_validate_thread(DataHandler &$dataHandler): DataHandle
 
             $userIDs = [];
 
-            while ($userIDs[] = (int)$db->fetch_field($dbQuery, 'uid')) {
+            while ($userID = $db->fetch_field($dbQuery, 'uid')) {
+                $userIDs[] = (int)$userID;
             }
 
             $userIDs = array_filter($userIDs);
@@ -270,12 +273,12 @@ function datahandler_post_validate_thread(DataHandler &$dataHandler): DataHandle
                 $dataHandler->set_error($lang->ougcPrivateThreadsErrorEmpty);
             }
 
-            $dataHandler->ougcPrivateThreadsUsersList = implode(',', $userIDs);
+            $ougcPrivateThreadsUsersList = implode(',', $userIDs);
         }
     }
 
     if (!$dataHandler->errors) {
-        $dataHandler->ougcPrivateThreadsMarkAsPrivateThread = $isPrivateThread;
+        $ougcPrivateThreadsMarkAsPrivateThread = $isPrivateThread;
     }
 
     return $dataHandler;
@@ -284,7 +287,7 @@ function datahandler_post_validate_thread(DataHandler &$dataHandler): DataHandle
 // moderator permission: ok
 // forums permissions: ok
 // groups permissions: ok
-function datahandler_post_validate_post(DataHandler &$dataHandler): DataHandler
+function datahandler_post_validate_post(PostDataHandler &$dataHandler): PostDataHandler
 {
     if (!empty($dataHandler->first_post)) {
         datahandler_post_validate_thread($dataHandler);
@@ -296,13 +299,14 @@ function datahandler_post_validate_post(DataHandler &$dataHandler): DataHandler
 // moderator permission: ok
 // forums permissions: ok
 // groups permissions: ok
-function datahandler_post_insert_thread(DataHandler &$dataHandler): DataHandler
+function datahandler_post_insert_thread(PostDataHandler &$dataHandler): PostDataHandler
 {
     global $plugins;
+    global $ougcPrivateThreadsMarkAsPrivateThread, $ougcPrivateThreadsNotificationUsers, $ougcPrivateThreadsUsersList;
 
     $isThreadUpdate = $plugins->current_hook === 'datahandler_post_update_thread';
 
-    if (!isset($dataHandler->ougcPrivateThreadsMarkAsPrivateThread)) {
+    if (!isset($ougcPrivateThreadsMarkAsPrivateThread)) {
         return $dataHandler;
     }
 
@@ -322,15 +326,15 @@ function datahandler_post_insert_thread(DataHandler &$dataHandler): DataHandler
     }
 
     if (isset($dataHandler->thread_insert_data)) {
-        $dataHandler->thread_insert_data['ougcPrivateThreads_isPrivateThread'] = $dataHandler->ougcPrivateThreadsMarkAsPrivateThread;
+        $dataHandler->thread_insert_data['ougcPrivateThreads_isPrivateThread'] = $ougcPrivateThreadsMarkAsPrivateThread;
 
-        $dataHandler->thread_insert_data['ougcPrivateThreads_userIDs'] = $dataHandler->ougcPrivateThreadsUsersList;
+        $dataHandler->thread_insert_data['ougcPrivateThreads_userIDs'] = $ougcPrivateThreadsUsersList;
     }
 
     if (isset($dataHandler->thread_update_data)) {
-        $dataHandler->thread_update_data['ougcPrivateThreads_isPrivateThread'] = $dataHandler->ougcPrivateThreadsMarkAsPrivateThread;
+        $dataHandler->thread_update_data['ougcPrivateThreads_isPrivateThread'] = $ougcPrivateThreadsMarkAsPrivateThread;
 
-        $dataHandler->thread_update_data['ougcPrivateThreads_userIDs'] = $dataHandler->ougcPrivateThreadsUsersList;
+        $dataHandler->thread_update_data['ougcPrivateThreads_userIDs'] = $ougcPrivateThreadsUsersList;
     }
 
     if ($isThreadUpdate) {
@@ -340,7 +344,7 @@ function datahandler_post_insert_thread(DataHandler &$dataHandler): DataHandler
     }
 
     // we delete thread subscriptions because we are making them private
-    // ideally they shouldn't be deleted but the datahandler is a mess
+    // ideally they shouldn't be deleted, but the datahandler is a mess
     if ($isThreadUpdate && getSetting('deleteSubscriptions')) {
         global $db;
 
@@ -354,29 +358,30 @@ function datahandler_post_insert_thread(DataHandler &$dataHandler): DataHandler
     }
 
     if (getSetting('notificationTypes')) {
-        $dataHandler->ougcPrivateThreadsNotificationUsers = '';
+        $ougcPrivateThreadsNotificationUsers = '';
 
         if ($isThreadUpdate) {
             $threadData = get_thread($dataHandler->tid);
 
-            $dataHandler->ougcPrivateThreadsNotificationUsers = $threadData['ougcPrivateThreads_userIDs'];
+            $ougcPrivateThreadsNotificationUsers = $threadData['ougcPrivateThreads_userIDs'];
         }
     }
 
     return $dataHandler;
 }
 
-function datahandler_post_insert_thread_post(DataHandler &$dataHandler): DataHandler
+function datahandler_post_insert_thread_post(PostDataHandler &$dataHandler): PostDataHandler
 {
     global $mybb, $lang, $parser;
+    global $ougcPrivateThreadsNotificationUsers, $ougcPrivateThreadsUsersList;
 
-    if (!isset($dataHandler->ougcPrivateThreadsNotificationUsers)) {
+    if (!isset($ougcPrivateThreadsNotificationUsers)) {
         return $dataHandler;
     }
 
-    $previousUserIDs = explode(',', $dataHandler->ougcPrivateThreadsNotificationUsers);
+    $previousUserIDs = explode(',', $ougcPrivateThreadsNotificationUsers);
 
-    $newUserIDs = explode(',', $dataHandler->ougcPrivateThreadsUsersList);
+    $newUserIDs = explode(',', $ougcPrivateThreadsUsersList);
 
     $newNotificationUserIDs = array_diff($newUserIDs, $previousUserIDs);
 
@@ -483,7 +488,7 @@ function datahandler_post_insert_thread_post(DataHandler &$dataHandler): DataHan
 // moderator permission: ok
 // forums permissions: ok
 // groups permissions: ok
-function datahandler_post_update_thread(DataHandler &$dataHandler): DataHandler
+function datahandler_post_update_thread(PostDataHandler &$dataHandler): PostDataHandler
 {
     datahandler_post_insert_thread($dataHandler);
 
@@ -648,7 +653,7 @@ function forumdisplay_start(): void
     $forumID = $mybb->get_input('fid', MyBB::INPUT_INT);
 
     if (!isAllowedForum($forumID)) {
-		return;
+        return;
     }
 
     /**--**/
@@ -657,7 +662,7 @@ function forumdisplay_start(): void
     $forumPermissions = $forumPermissionsCache[$forumID];
 
     if (!$forumPermissions['canviewthreads']) {
-		return;
+        return;
     }
 
     $visibleStates = [1];
@@ -740,7 +745,7 @@ function showthread_start(): void
         (int)$thread['uid'] == $mybb->user['uid'] ||
         my_strpos(',' . $thread['ougcPrivateThreads_userIDs'] . ',', ',' . $mybb->user['uid'] . ',') !== false
     ) {
-		return;
+        return;
     }
 
     if (function_exists('archive_error_no_permission')) {
@@ -767,7 +772,7 @@ function showthread_end(): void
         !empty($thread['ougcPrivateThreads_isPrivateThread']) &&
         getSetting('showUserList')
     )) {
-		return;
+        return;
     }
 
     loadLanguage();
@@ -821,7 +826,7 @@ function newreply_start(): void
     // The following code deals with quotes
 
     if (!isAllowedForum() || $plugins->current_hook !== 'newreply_start') {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -861,7 +866,7 @@ function xmlhttp_get_multiquoted_intermediate(): void
     global $unviewable_forums;
 
     if (!isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -875,7 +880,7 @@ function xmlhttp_get_multiquoted_intermediate(): void
 function syndication_start(): void
 {
     if (!isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses(false);
@@ -907,7 +912,7 @@ function portal_start(): void
     global $settings;
 
     if (!isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -973,7 +978,7 @@ function archive_start(): void
     global $action;
 
     if ($action !== 'forum' || !isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses(false);
@@ -1058,7 +1063,7 @@ function attachment_start(): void
     $thread = get_thread($postData['tid']);
 
     if (empty($thread)) {
-		return;
+        return;
     }
 
     showthread_start();
@@ -1072,7 +1077,7 @@ function report_type(): void
     global $report_type, $post, $mybb, $error, $lang;
 
     if ($report_type !== 'post') {
-		return;
+        return;
     }
 
     $mybb->user['uid'] = (int)$mybb->user['uid'];
@@ -1087,7 +1092,7 @@ function report_type(): void
         (int)$threadData['uid'] == $mybb->user['uid'] ||
         my_strpos(',' . $threadData['ougcPrivateThreads_userIDs'] . ',', ',' . $mybb->user['uid'] . ',') !== false
     ) {
-		return;
+        return;
     }
 
     $error = $lang->sprintf($lang->error_invalid_report, $report_type);
@@ -1122,7 +1127,7 @@ function reputation_start(): void
     global $mybb;
 
     if ($mybb->get_input('action') || !isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1154,7 +1159,7 @@ function usercp_notepad_end(): void
     global $mybb;
 
     if ($mybb->get_input('action') || !isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1184,7 +1189,7 @@ function usercp_notepad_end(): void
 function usercp_subscriptions_start(): void
 {
     if (!isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1225,7 +1230,7 @@ function usercp_attachments_start(): void
     global $db, $mybb;
 
     if (!isAllowedForum()) {
-		return;
+        return;
     }
 
     $whereClauses = buildWhereClauses();
@@ -1275,7 +1280,7 @@ function usercp_do_attachments_start(): void
     $attachmentIDs = implode(',', array_map('intval', $mybb->get_input('attachments', MyBB::INPUT_ARRAY)));
 
     if (!$attachmentIDs) {
-		return;
+        return;
     }
 
     $dbQuery = $db->simple_select(
@@ -1304,7 +1309,7 @@ function search_end(): void
     if (!isAllowedForum(0, false) || !is_member(
             getSetting('enableSearchSystem')
         )) {
-		return;
+        return;
     }
 
     loadLanguage();
@@ -1315,7 +1320,7 @@ function search_end(): void
 // author permission: ok
 // moderator permission: ok
 // forums permissions: ok
-function search_do_search_process(): void
+function search_do_search_process11(): void
 {
     global $searcharray, $db, $mybb;
 
@@ -1336,38 +1341,57 @@ function search_do_search_process(): void
     }
 
     if (!$whereClauses) {
-		return;
+        return;
     }
 
     $whereClauses = implode(' AND ', $whereClauses);
 
-    // $searcharray['querycache'] works for threads, not posts..
-    if ($searcharray['resulttype'] === 'posts') {
-        $psotIDs = implode("','", array_filter(array_map('intval', explode(',', $searcharray['posts']))));
+    if (!empty($searcharray['threads'])) {
+        $threadIDs = implode("','", array_filter(array_map('intval', explode(',', $searcharray['threads']))));
+
+        $dbQuery = $db->simple_select(
+            'threads t',
+            't.tid',
+            "t.tid IN ('{$threadIDs}') AND {$whereClauses}"
+        );
+
+        $threadIDs = [];
+
+        while ($threadID = $db->fetch_field($dbQuery, 'tid')) {
+            $threadIDs[] = (int)$threadID;
+        }
+
+        $searcharray['threads'] = implode(',', array_filter($threadIDs));
+    } elseif (!empty($searcharray['posts'])) {
+        $postIDs = implode("','", array_filter(array_map('intval', explode(',', $searcharray['posts']))));
 
         $dbQuery = $db->simple_select(
             'posts p LEFT JOIN ' . $db->table_prefix . 'threads t ON (t.tid=p.tid)',
             'p.pid',
-            "p.pid IN ('{$psotIDs}') AND {$whereClauses}"
+            "p.pid IN ('{$postIDs}') AND {$whereClauses}"
         );
 
-        $psotIDs = [];
+        $postIDs = [];
 
-        while ($psotIDs[] = (int)$db->fetch_field($dbQuery, 'pid')) {
+        while ($postID = $db->fetch_field($dbQuery, 'pid')) {
+            $postIDs[] = (int)$postID;
         }
 
-        $searcharray['posts'] = implode(',', array_filter($psotIDs));
+        $searcharray['posts'] = implode(',', array_filter($postIDs));
     }
 
-    if ($searcharray['querycache']) {
+    if (!empty($searcharray['querycache'])) {
         $searcharray['querycache'] .= ' AND ';
-    }
 
-    $searcharray['querycache'] .= $db->escape_string($whereClauses);
+        $searcharray['querycache'] .= $db->escape_string($whereClauses);
+    }
 }
 
 function search_results_start(): void
 {
+    /**
+     * @var array $search
+     */
     global $search;
 
     if (isAllowedForum(0, false) && getSetting('prefixClassName')) {
@@ -1428,7 +1452,7 @@ function search_results_thread(&$postData = null): void
     }
 
     if (!getSetting('prefixClassName')) {
-		return;
+        return;
     }
 
     $styleClassName = '';

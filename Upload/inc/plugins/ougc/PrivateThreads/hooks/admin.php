@@ -42,10 +42,10 @@ function admin_config_plugins_begin01(): void
     global $mybb, $lang, $page;
 
     if ($mybb->get_input('action') !== 'ougcPrivateThreads') {
-		return;
+        return;
     }
 
-	loadLanguage();
+    loadLanguage();
 
     if ($mybb->get_input('no') || !MyAlertsIsIntegrable()) {
         admin_redirect('index.php?module=config-plugins');
@@ -78,7 +78,7 @@ function admin_config_plugins_deactivate(): void
         $mybb->get_input('plugin') != 'ougcPrivateThreads' ||
         !$mybb->get_input('uninstall', MyBB::INPUT_INT)
     ) {
-		return;
+        return;
     }
 
     if ($mybb->request_method != 'post') {

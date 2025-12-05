@@ -28,10 +28,13 @@
 
 namespace ougc\PrivateThreads\Core;
 
+use AbstractPdoDbDriver;
+use DB_SQLite;
 use MybbStuff_MyAlerts_AlertManager;
 use MybbStuff_MyAlerts_AlertTypeManager;
 use MybbStuff_MyAlerts_Entity_Alert;
 use PMDataHandler;
+use ReflectionProperty;
 use stdClass;
 
 use function ougc\PrivateThreads\Admin\pluginInformation;
@@ -98,8 +101,8 @@ function getSetting(string $settingKey = '')
     global $mybb;
 
     return SETTINGS[$settingKey] ?? (
-		$mybb->settings['ougcPrivateThreads_' . $settingKey] ?? false
-	);
+        $mybb->settings['ougcPrivateThreads_' . $settingKey] ?? false
+    );
 }
 
 function getTemplateName(string $templateName = ''): string
@@ -337,4 +340,76 @@ function allowedGroup(): bool
     global $mybb;
 
     return (bool)is_member(getSetting('allowedGroups'), $mybb->user);
+}
+
+// control_object by Zinga Burga from MyBBHacks ( mybbhacks.zingaburga.com )
+function control_object(&$obj, $code)
+{
+    static $cnt = 0;
+    $newname = '_objcont_ougcprivate_threads_' . (++$cnt);
+    $objserial = serialize($obj);
+    $classname = get_class($obj);
+    $checkstr = 'O:' . strlen($classname) . ':"' . $classname . '":';
+    $checkstr_len = strlen($checkstr);
+    if (substr($objserial, 0, $checkstr_len) == $checkstr) {
+        $vars = array();
+        // grab resources/object etc, stripping scope info from keys
+        foreach ((array)$obj as $k => $v) {
+            if ($p = strrpos($k, "\0")) {
+                $k = substr($k, $p + 1);
+            }
+            $vars[$k] = $v;
+        }
+        if (!empty($vars)) {
+            $code .= '
+					function ___setvars(&$a) {
+						foreach($a as $k => &$v)
+							$this->$k = $v;
+					}
+				';
+        }
+        eval('class ' . $newname . ' extends ' . $classname . ' {' . $code . '}');
+        $obj = unserialize('O:' . strlen($newname) . ':"' . $newname . '":' . substr($objserial, $checkstr_len));
+        if (!empty($vars)) {
+            $obj->___setvars($vars);
+        }
+    }
+    // else not a valid object or PHP serialize has changed
+}
+
+// explicit workaround for PDO, as trying to serialize it causes a fatal error (even though PHP doesn't complain over serializing other resources)
+if ($GLOBALS['db'] instanceof AbstractPdoDbDriver) {
+    $GLOBALS['AbstractPdoDbDriver_lastResult_prop'] = new ReflectionProperty('AbstractPdoDbDriver', 'lastResult');
+    $GLOBALS['AbstractPdoDbDriver_lastResult_prop']->setAccessible(true);
+    function control_db($code)
+    {
+        global $db;
+        $linkvars = array(
+            'read_link' => $db->read_link,
+            'write_link' => $db->write_link,
+            'current_link' => $db->current_link,
+        );
+        unset($db->read_link, $db->write_link, $db->current_link);
+        $lastResult = $GLOBALS['AbstractPdoDbDriver_lastResult_prop']->getValue($db);
+        $GLOBALS['AbstractPdoDbDriver_lastResult_prop']->setValue($db, null); // don't let this block serialization
+        control_object($db, $code);
+        foreach ($linkvars as $k => $v) {
+            $db->$k = $v;
+        }
+        $GLOBALS['AbstractPdoDbDriver_lastResult_prop']->setValue($db, $lastResult);
+    }
+} elseif ($GLOBALS['db'] instanceof DB_SQLite) {
+    function control_db($code)
+    {
+        global $db;
+        $oldLink = $db->db;
+        unset($db->db);
+        control_object($db, $code);
+        $db->db = $oldLink;
+    }
+} else {
+    function control_db($code)
+    {
+        control_object($GLOBALS['db'], $code);
+    }
 }
